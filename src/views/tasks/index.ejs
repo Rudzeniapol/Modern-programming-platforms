@@ -1,0 +1,127 @@
+<%- include('../partials/head', { title }) %>
+
+<%
+  // Ссылки фильтра собираем на сервере, сохраняя остальные параметры выборки.
+  const buildLink = (overrides = {}) => {
+    const merged = Object.assign({ status: filter.status, sort: filter.sort, q: filter.query }, overrides);
+    const params = new URLSearchParams();
+    if (merged.status && merged.status !== 'all') params.set('status', merged.status);
+    if (merged.sort && merged.sort !== 'dueDate') params.set('sort', merged.sort);
+    if (merged.q) params.set('q', merged.q);
+    const qs = params.toString();
+    return '/tasks' + (qs ? '?' + qs : '');
+  };
+  const hasErrors = Object.keys(errors).length > 0;
+%>
+
+<%- include('../partials/notice', { notice }) %>
+
+<section class="panel">
+  <h1 class="panel__title">Новая задача</h1>
+  <!-- enctype обязателен: без него браузер отправит только имена файлов -->
+  <form class="task-form" action="/tasks<%= filterQuery %>" method="post" enctype="multipart/form-data">
+    <%- include('../partials/task-fields', { form, errors, prefix: 'new' }) %>
+    <% if (hasErrors) { %>
+      <p class="form-error">Проверьте поля формы — задача не сохранена.</p>
+    <% } %>
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Добавить задачу</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="filters">
+    <nav class="tabs" aria-label="Фильтр по статусу">
+      <a class="tab <%= filter.status === 'all' ? 'tab--active' : '' %>" href="<%= buildLink({ status: 'all' }) %>">
+        Все <span class="tab__count"><%= counts.all || 0 %></span>
+      </a>
+      <% STATUSES.forEach((status) => { %>
+        <a class="tab tab--<%= status.value %> <%= filter.status === status.value ? 'tab--active' : '' %>"
+           href="<%= buildLink({ status: status.value }) %>">
+          <%= status.label %> <span class="tab__count"><%= counts[status.value] || 0 %></span>
+        </a>
+      <% }); %>
+    </nav>
+
+    <form class="filters__form" action="/tasks" method="get">
+      <input type="hidden" name="status" value="<%= filter.status %>">
+      <input class="filters__search" type="search" name="q" value="<%= filter.query %>" placeholder="Поиск по названию и описанию">
+      <select name="sort" aria-label="Сортировка">
+        <option value="dueDate" <%= filter.sort === 'dueDate' ? 'selected' : '' %>>По сроку</option>
+        <option value="created" <%= filter.sort === 'created' ? 'selected' : '' %>>По дате создания</option>
+        <option value="title" <%= filter.sort === 'title' ? 'selected' : '' %>>По названию</option>
+      </select>
+      <button class="btn" type="submit">Применить</button>
+      <a class="btn btn--ghost" href="/tasks">Сбросить</a>
+    </form>
+  </div>
+
+  <% if (tasks.length === 0) { %>
+    <p class="empty">
+      <% if (counts.all) { %>
+        Под выбранный фильтр не подходит ни одна задача.
+      <% } else { %>
+        Задач пока нет — добавьте первую с помощью формы выше.
+      <% } %>
+    </p>
+  <% } else { %>
+    <ul class="task-list">
+      <% tasks.forEach((task) => { %>
+        <li class="task task--<%= task.status %> <%= isOverdue(task) ? 'task--overdue' : '' %>">
+          <div class="task__head">
+            <h2 class="task__title"><%= task.title %></h2>
+            <span class="badge badge--<%= task.status %>"><%= statusLabel(task.status) %></span>
+          </div>
+
+          <% if (task.description) { %>
+            <p class="task__description"><%= task.description %></p>
+          <% } %>
+
+          <p class="task__meta">
+            <% if (task.dueDate) { %>
+              <span class="task__due <%= isOverdue(task) ? 'is-overdue' : (isDueToday(task) ? 'is-today' : '') %>">
+                📅 Срок: <%= formatDate(task.dueDate) %><%= isOverdue(task) ? ' · просрочено' : (isDueToday(task) ? ' · сегодня' : '') %>
+              </span>
+            <% } else { %>
+              <span class="task__due">📅 Срок не задан</span>
+            <% } %>
+            <span class="task__created">Создана <%= formatDateTime(task.createdAt) %></span>
+          </p>
+
+          <% if (task.attachments.length) { %>
+            <ul class="attachments">
+              <% task.attachments.forEach((file) => { %>
+                <li class="attachments__item">
+                  <a href="/tasks/<%= task.id %>/attachments/<%= file.id %>">📎 <%= file.originalName %></a>
+                  <span class="attachments__size"><%= formatSize(file.size) %></span>
+                </li>
+              <% }); %>
+            </ul>
+          <% } %>
+
+          <div class="task__actions">
+            <form class="status-switch" action="/tasks/<%= task.id %>/status<%= filterQuery %>" method="post">
+              <span class="status-switch__label">Статус:</span>
+              <% STATUSES.forEach((status) => { %>
+                <button class="btn btn--chip <%= task.status === status.value ? 'btn--chip-active' : '' %>"
+                        type="submit" name="status" value="<%= status.value %>"
+                        <%= task.status === status.value ? 'disabled' : '' %>><%= status.label %></button>
+              <% }); %>
+            </form>
+
+            <div class="task__links">
+              <a class="btn btn--ghost" href="/tasks/<%= task.id %>/edit<%= filterQuery %>">Редактировать</a>
+              <form action="/tasks/<%= task.id %>/delete<%= filterQuery %>" method="post"
+                    onsubmit="return confirm('Удалить задачу вместе с вложениями? Действие необратимо.');">
+                <button class="btn btn--danger" type="submit">Удалить</button>
+              </form>
+            </div>
+          </div>
+        </li>
+      <% }); %>
+    </ul>
+  <% } %>
+</section>
+
+<%- include('../partials/foot') %>

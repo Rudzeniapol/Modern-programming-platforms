@@ -1,0 +1,11 @@
+<% const NOTICES = {
+     created: 'Задача добавлена.',
+     saved: 'Изменения сохранены.',
+     status: 'Статус задачи обновлён.',
+     deleted: 'Задача удалена вместе с вложениями.',
+     'file-deleted': 'Файл удалён.'
+   };
+   const noticeText = notice && NOTICES[notice]; %>
+<% if (noticeText) { %>
+  <p class="notice" role="status"><%= noticeText %></p>
+<% } %>

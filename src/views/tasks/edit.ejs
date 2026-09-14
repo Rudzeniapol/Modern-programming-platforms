@@ -1,0 +1,47 @@
+<%- include('../partials/head', { title }) %>
+
+<p class="breadcrumbs"><a href="/tasks<%= filterQuery %>">← К списку задач</a></p>
+
+<%- include('../partials/notice', { notice }) %>
+
+<section class="panel">
+  <h1 class="panel__title">Редактирование задачи</h1>
+
+  <form class="task-form" action="/tasks/<%= task.id %><%= filterQuery %>" method="post" enctype="multipart/form-data">
+    <%- include('../partials/task-fields', { form, errors, prefix: 'edit' }) %>
+    <% if (Object.keys(errors).length) { %>
+      <p class="form-error">Проверьте поля формы — изменения не сохранены.</p>
+    <% } %>
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Сохранить</button>
+      <a class="btn btn--ghost" href="/tasks<%= filterQuery %>">Отмена</a>
+    </div>
+  </form>
+
+  <p class="task__created">
+    Создана <%= formatDateTime(task.createdAt) %> · изменена <%= formatDateTime(task.updatedAt) %>
+  </p>
+</section>
+
+<section class="panel">
+  <h2 class="panel__title">Вложения (<%= task.attachments.length %>)</h2>
+
+  <% if (!task.attachments.length) { %>
+    <p class="empty">Файлов пока нет. Добавьте их через поле «Вложения» в форме выше.</p>
+  <% } else { %>
+    <ul class="attachments attachments--list">
+      <% task.attachments.forEach((file) => { %>
+        <li class="attachments__item">
+          <a href="/tasks/<%= task.id %>/attachments/<%= file.id %>">📎 <%= file.originalName %></a>
+          <span class="attachments__size"><%= formatSize(file.size) %> · <%= formatDateTime(file.uploadedAt) %></span>
+          <form action="/tasks/<%= task.id %>/attachments/<%= file.id %>/delete<%= filterQuery %>" method="post"
+                onsubmit="return confirm('Удалить файл?');">
+            <button class="btn btn--danger btn--small" type="submit">Удалить</button>
+          </form>
+        </li>
+      <% }); %>
+    </ul>
+  <% } %>
+</section>
+
+<%- include('../partials/foot') %>
