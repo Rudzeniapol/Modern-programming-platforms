@@ -2,7 +2,7 @@
   "name": "spp-lab1-tasks",
   "version": "1.0.0",
   "private": true,
-  "description": "СПП. Лабораторная работа №1 — список задач с серверным рендерингом (Express + EJS)",
+  "description": "Todo-list",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
