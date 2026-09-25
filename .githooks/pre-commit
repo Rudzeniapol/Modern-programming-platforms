@@ -1,0 +1,17 @@
+#!/bin/sh
+# Локальная проверка перед коммитом (та же, что в CI, но без тестов с БД):
+# ESLint для изменённых частей Lab3. Включение:  git config core.hooksPath .githooks
+set -e
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+for part in server client; do
+  if echo "$staged" | grep -q "^Lab3/$part/.*\.jsx\?$"; then
+    if [ ! -d "Lab3/$part/node_modules" ]; then
+      echo "pre-commit: пропускаю Lab3/$part — сначала выполните npm install" >&2
+      continue
+    fi
+    echo "pre-commit: ESLint Lab3/$part"
+    (cd "Lab3/$part" && npx --no-install eslint .)
+  fi
+done

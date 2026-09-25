@@ -1,0 +1,81 @@
+# Четыре контейнера: база данных, REST API, SPA за nginx и почтовый сервер Mailpit
+# (перехватывает письма восстановления доступа и показывает их в веб-интерфейсе).
+# Запуск: docker compose up --build  →  http://localhost:8089, почта — http://localhost:8026
+
+name: spp-lab3
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tasks}
+      POSTGRES_USER: ${POSTGRES_USER:-tasks}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tasks}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # API стартует только после того, как база начнёт принимать соединения.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tasks} -d ${POSTGRES_DB:-tasks}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  mail:
+    image: axllent/mailpit:v1.27
+    ports:
+      # Веб-интерфейс почтового ящика: сюда приходят письма со ссылками сброса пароля.
+      - "${MAIL_UI_PORT:-8026}:8025"
+    restart: unless-stopped
+
+  api:
+    build: ./server
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-tasks}:${POSTGRES_PASSWORD:-tasks}@db:5432/${POSTGRES_DB:-tasks}
+      UPLOADS_DIR: /app/uploads
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Ключ подписи access-токенов. Обязательно замените в .env для реального развёртывания.
+      JWT_SECRET: ${JWT_SECRET:-lab3-demo-secret-please-change-me-0f9c2b7e4a1d}
+      ACCESS_TOKEN_TTL_SEC: ${ACCESS_TOKEN_TTL_SEC:-900}
+      REFRESH_TOKEN_TTL_SEC: ${REFRESH_TOKEN_TTL_SEC:-604800}
+      MAX_SESSIONS_PER_USER: ${MAX_SESSIONS_PER_USER:-5}
+      LOGIN_MAX_FAILURES_PER_ACCOUNT: ${LOGIN_MAX_FAILURES_PER_ACCOUNT:-5}
+      LOGIN_LOCKOUT_SEC: ${LOGIN_LOCKOUT_SEC:-900}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin12345}
+      # Ссылка в письме ведёт на SPA.
+      APP_URL: ${APP_URL:-http://localhost:8089}
+      SMTP_HOST: mail
+      SMTP_PORT: 1025
+      MAIL_FROM: "Менеджер задач <no-reply@tasks.local>"
+    volumes:
+      # Именованный том: загруженные файлы переживают пересборку образа.
+      - uploads:/app/uploads
+    ports:
+      # Порт наружу нужен только чтобы дёргать API напрямую (curl, Postman).
+      - "${API_PORT:-3003}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      mail:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  web:
+    build: ./client
+    ports:
+      - "${WEB_PORT:-8089}:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:

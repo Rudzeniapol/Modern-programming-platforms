@@ -11,3 +11,8 @@ Lab1/data/*.json
 Lab2/server/uploads/*
 !Lab2/server/uploads/.gitkeep
 Lab2/client/dist/
+
+# Лабораторная №3
+Lab3/server/uploads/*
+!Lab3/server/uploads/.gitkeep
+Lab3/client/dist/

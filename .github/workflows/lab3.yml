@@ -1,0 +1,102 @@
+# Автоматическая проверка кода лабораторной работы №3.
+# Запускается на каждый push и pull request, затрагивающий Lab3/ или этот файл:
+#   1) server — ESLint + автотесты API на настоящем PostgreSQL;
+#   2) client — ESLint + production-сборка SPA;
+#   3) docker — проверка docker-compose.yml и сборка образов;
+#   4) audit  — поиск уязвимостей в production-зависимостях.
+# PR с красной проверкой не должен вливаться в main (включается в Branch protection rules).
+
+name: Lab3 CI
+
+on:
+  push:
+    paths: ['Lab3/**', '.github/workflows/lab3.yml']
+  pull_request:
+    paths: ['Lab3/**', '.github/workflows/lab3.yml']
+  workflow_dispatch:
+
+# Новый push в ту же ветку отменяет устаревший прогон.
+concurrency:
+  group: lab3-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    name: API — lint и тесты
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Lab3/server
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tasks
+          POSTGRES_PASSWORD: tasks
+          POSTGRES_DB: tasks_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U tasks -d tasks_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://tasks:tasks@localhost:5432/tasks_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Lab3/server/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  client:
+    name: SPA — lint и сборка
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Lab3/client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Lab3/client/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  docker:
+    name: Docker — сборка образов
+    runs-on: ubuntu-latest
+    needs: [server, client]
+    defaults:
+      run:
+        working-directory: Lab3
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config --quiet
+      - run: docker compose build
+
+  audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [server, client]
+    defaults:
+      run:
+        working-directory: Lab3/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm audit --omit=dev --audit-level=high
