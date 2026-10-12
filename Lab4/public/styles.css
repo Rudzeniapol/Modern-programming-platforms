@@ -1,0 +1,195 @@
+/* Оформление «Пиксельной битвы». Цвета — переменные: светлая и тёмная темы. */
+
+:root {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --text: #1d2433;
+  --muted: #6b7488;
+  --border: #e2e6f0;
+  --primary: #3457d5;
+  --danger: #c8392f;
+  --warn: #b7791f;
+  --success: #1f7a4d;
+  --cell-empty: #eef0f5;
+  --cell-grid: rgba(20, 27, 45, 0.07);
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(20, 27, 45, 0.06), 0 8px 24px rgba(20, 27, 45, 0.05);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151c;
+    --surface: #1b1f29;
+    --text: #e8eaf1;
+    --muted: #9aa3b8;
+    --border: #2c3242;
+    --primary: #6c8cff;
+    --danger: #f08379;
+    --warn: #e2b04a;
+    --success: #5fcf98;
+    --cell-empty: #232835;
+    --cell-grid: rgba(255, 255, 255, 0.05);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 "Segoe UI", Roboto, system-ui, sans-serif;
+}
+
+h1 { font-size: 22px; margin: 0 0 8px; }
+h2 { font-size: 14px; margin: 0 0 10px; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; margin: 4px 0 0; }
+.empty { color: var(--muted); }
+
+/* ---------- верхняя панель ---------- */
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); }
+.topbar__inner {
+  max-width: 1280px; margin: 0 auto; padding: 10px 16px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.brand { font-weight: 700; font-size: 18px; }
+.round { margin-left: auto; color: var(--muted); }
+.round strong { color: var(--text); font-variant-numeric: tabular-nums; font-size: 17px; margin-left: 4px; }
+
+.net {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 13px;
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border);
+}
+.net__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.net--open .net__dot { background: var(--success); }
+.net--closed { color: var(--danger); border-color: currentColor; }
+.net--closed .net__dot { background: var(--danger); }
+.net__ping { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.banner {
+  max-width: 1280px; margin: 12px auto 0; padding: 10px 14px;
+  background: #fdecea; color: var(--danger); border: 1px solid #f3c2bd; border-radius: 8px;
+  width: calc(100% - 32px);
+}
+@media (prefers-color-scheme: dark) {
+  .banner { background: #3a2320; border-color: #5d3a34; }
+}
+
+/* ---------- раскладка ---------- */
+.layout {
+  max-width: 1280px; margin: 16px auto; padding: 0 16px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start;
+}
+@media (max-width: 960px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+.board-panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 12px;
+}
+.board {
+  display: block; width: 100%; height: auto; border-radius: 6px;
+  cursor: crosshair; touch-action: manipulation; image-rendering: pixelated;
+}
+.board-hint { margin: 8px 2px 0; font-size: 13px; color: var(--muted); min-height: 20px; }
+
+.sidebar { display: flex; flex-direction: column; gap: 12px; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px 16px;
+}
+
+/* ---------- карточка игрока ---------- */
+.me { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.me strong { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-badge {
+  font-size: 12px; font-weight: 600; color: #fff; padding: 3px 10px; border-radius: 999px;
+  background: var(--team);
+}
+.charges { display: grid; grid-template-columns: repeat(var(--count, 10), 1fr); gap: 3px; }
+.charges__cell { height: 10px; border-radius: 3px; background: var(--border); transition: background 0.2s; }
+.charges__cell.is-full { background: var(--team); }
+
+/* ---------- счёт ---------- */
+.scores, .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.score { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 14px; }
+.score.is-leader .score__name::after { content: " 👑"; }
+.score__value { color: var(--muted); font-variant-numeric: tabular-nums; }
+.score__bar { grid-column: 1 / -1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.score__fill { display: block; height: 100%; width: var(--share); background: var(--team); transition: width 0.4s; }
+
+.list li { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.list li > span:last-child.muted { margin-left: auto; font-variant-numeric: tabular-nums; }
+ol.list { counter-reset: place; }
+ol.list li::before { counter-increment: place; content: counter(place) "."; color: var(--muted); width: 18px; }
+ol.list li.empty::before { content: none; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--team, var(--muted)); flex: none; }
+
+/* ---------- диалог входа ---------- */
+.join {
+  border: none; border-radius: 16px; padding: 0; width: min(440px, calc(100% - 32px));
+  background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+.join::backdrop { background: rgba(10, 12, 20, 0.55); }
+.join__form { padding: 24px; display: flex; flex-direction: column; gap: 8px; }
+.join__form p { margin: 0 0 8px; }
+label, .label { font-size: 13px; font-weight: 600; color: var(--muted); margin-top: 6px; }
+input[type="text"] {
+  font: inherit; color: inherit; background: var(--surface);
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; width: 100%;
+}
+input:focus-visible, button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.team-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.team-choice {
+  font: inherit; cursor: pointer; text-align: left; padding: 10px 12px; border-radius: 10px;
+  border: 2px solid var(--border); background: var(--surface); color: var(--text);
+  display: flex; flex-direction: column; gap: 2px;
+  box-shadow: inset 6px 0 0 var(--team);
+}
+.team-choice[aria-pressed="true"] { border-color: var(--team); background: color-mix(in srgb, var(--team) 12%, var(--surface)); }
+.team-choice__name { font-weight: 600; padding-left: 6px; }
+.team-choice__count { font-size: 12px; color: var(--muted); padding-left: 6px; }
+
+.error { color: var(--danger); font-size: 13px; min-height: 18px; margin: 0; }
+.join__actions { display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+
+.btn {
+  font: inherit; font-weight: 600; font-size: 14px; padding: 9px 18px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+}
+.btn--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn--ghost { background: transparent; }
+
+/* ---------- итоги раунда ---------- */
+.round-overlay {
+  position: fixed; inset: 0; display: grid; place-items: center;
+  background: rgba(10, 12, 20, 0.45); z-index: 20;
+}
+.round-overlay[hidden] { display: none; }
+.round-overlay__card {
+  background: var(--surface); border-radius: 16px; padding: 32px 36px 28px; text-align: center;
+  box-shadow: inset 0 8px 0 var(--team), 0 20px 60px rgba(0, 0, 0, 0.3); max-width: calc(100% - 32px);
+}
+.round-overlay__card p { margin: 4px 0; }
+.round-overlay__title { font-size: 28px; font-weight: 700; color: var(--team); }
+
+/* ---------- уведомления ---------- */
+.toasts {
+  position: fixed; right: 16px; bottom: 16px; z-index: 30;
+  display: flex; flex-direction: column; gap: 8px; max-width: min(420px, calc(100% - 32px));
+}
+.toast {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-left: 4px solid var(--primary); border-radius: 8px; padding: 10px 14px;
+  box-shadow: var(--shadow); font-size: 14px; transition: opacity 0.4s, transform 0.4s;
+}
+.toast--success { border-left-color: var(--success); }
+.toast--warn { border-left-color: var(--warn); }
+.toast--error { border-left-color: var(--danger); }
+.toast.is-leaving { opacity: 0; transform: translateY(8px); }

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Пиксельная битва</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="js/main.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar__inner">
+        <span class="brand">Пиксельная битва</span>
+        <span class="round"><span id="round-label">Раунд</span> <strong id="round-timer">--:--</strong></span>
+        <span id="net-status" class="net net--connecting" role="status">
+          <span class="net__dot" aria-hidden="true"></span>
+          <span id="net-text">Подключение…</span>
+          <span id="net-ping" class="net__ping"></span>
+        </span>
+      </div>
+    </header>
+
+    <div id="banner" class="banner" role="alert" hidden></div>
+
+    <main class="layout">
+      <section class="board-panel">
+        <canvas id="board" class="board" aria-label="Игровое поле"></canvas>
+        <p id="board-hint" class="board-hint"></p>
+      </section>
+
+      <aside class="sidebar">
+        <section id="me-card" class="card" hidden>
+          <div class="me">
+            <strong id="me-name"></strong>
+            <span id="me-team" class="team-badge"></span>
+          </div>
+          <div id="charges" class="charges" aria-hidden="true"></div>
+          <p id="charges-text" class="muted small"></p>
+          <p id="me-total" class="muted small"></p>
+        </section>
+
+        <section class="card">
+          <h2>Команды</h2>
+          <ul id="team-scores" class="scores"></ul>
+        </section>
+
+        <section class="card">
+          <h2>Лучшие игроки раунда</h2>
+          <ol id="top-players" class="list"></ol>
+        </section>
+
+        <section class="card">
+          <h2>Онлайн <span id="spectators" class="muted small"></span></h2>
+          <ul id="online" class="list"></ul>
+        </section>
+
+        <section class="card">
+          <h2>Прошлые раунды</h2>
+          <ul id="history" class="list"></ul>
+        </section>
+      </aside>
+    </main>
+
+    <dialog id="join-dialog" class="join">
+      <form id="join-form" class="join__form" novalidate>
+        <h1>Пиксельная битва</h1>
+        <p class="muted">
+          Четыре команды делят одно поле. Закрашивайте клетки цветом своей команды —
+          у кого к концу раунда больше территории, тот и победил.
+        </p>
+        <label for="join-name">Ваше имя</label>
+        <input id="join-name" type="text" maxlength="20" autocomplete="nickname" placeholder="Например, Пиксель" required />
+        <span class="label">Команда</span>
+        <div id="join-teams" class="team-choices"></div>
+        <p id="join-error" class="error" role="alert"></p>
+        <div class="join__actions">
+          <button type="submit" class="btn btn--primary">В бой</button>
+          <button type="button" id="join-spectate" class="btn btn--ghost">Просто посмотреть</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="round-overlay" class="round-overlay" hidden>
+      <div class="round-overlay__card">
+        <p class="muted">Раунд окончен</p>
+        <p id="round-result" class="round-overlay__title"></p>
+        <p id="round-details" class="muted"></p>
+        <p class="muted small">Новый раунд уже начался — поле очищено</p>
+      </div>
+    </div>
+
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+  </body>
+</html>

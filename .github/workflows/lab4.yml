@@ -1,0 +1,65 @@
+# Автоматическая проверка лабораторной работы №4 («Пиксельная битва»).
+# На каждый push и pull request, затрагивающий Lab4/: ESLint, автотесты
+# (unit + WebSocket-интеграция на настоящем PostgreSQL) и сборка Docker-образа.
+
+name: Lab4 CI
+
+on:
+  push:
+    paths: ['Lab4/**', '.github/workflows/lab4.yml']
+  pull_request:
+    paths: ['Lab4/**', '.github/workflows/lab4.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: lab4-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint и тесты
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Lab4
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pixels
+          POSTGRES_PASSWORD: pixels
+          POSTGRES_DB: pixels_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pixels -d pixels_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://pixels:pixels@localhost:5432/pixels_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Lab4/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm audit --omit=dev --audit-level=high
+
+  docker:
+    name: Сборка образа
+    runs-on: ubuntu-latest
+    needs: test
+    defaults:
+      run:
+        working-directory: Lab4
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config --quiet
+      - run: docker compose build

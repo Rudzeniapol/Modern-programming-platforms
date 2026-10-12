@@ -1,0 +1,46 @@
+# Два контейнера: PostgreSQL (состояние игры) и приложение (HTTP + WebSocket).
+# Запуск: docker compose up --build  →  http://localhost:8092
+
+name: spp-lab4
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pixels}
+      POSTGRES_USER: ${POSTGRES_USER:-pixels}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pixels}
+    volumes:
+      # Именованный том: поле, игроки и история раундов переживают перезапуск и пересборку.
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pixels} -d ${POSTGRES_DB:-pixels}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  app:
+    build: .
+    environment:
+      PORT: 8092
+      DATABASE_URL: postgres://${POSTGRES_USER:-pixels}:${POSTGRES_PASSWORD:-pixels}@db:5432/${POSTGRES_DB:-pixels}
+      ROUND_DURATION_SEC: ${ROUND_DURATION_SEC:-600}
+      CHARGES_MAX: ${CHARGES_MAX:-10}
+      CHARGE_REGEN_MS: ${CHARGE_REGEN_MS:-3000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${APP_PORT:-8092}:8092"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8092/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
