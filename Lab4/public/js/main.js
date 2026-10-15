@@ -12,9 +12,10 @@ import { Connection } from './connection.js';
 import { BoardRenderer } from './renderer.js';
 import { GameState } from './state.js';
 import { UI } from './ui.js';
-import { uuid } from './util.js';
+import { playedTeams, uuid } from './util.js';
 
 const CURSOR_SEND_MS = 80;
+const HISTORY_SIZE = 6; // столько же раундов присылает сервер (Game.history)
 
 const state = new GameState();
 const ui = new UI();
@@ -111,17 +112,7 @@ function onMessage(message) {
       scores = message.scores;
       return ui.renderScores(state, scores);
     case 'roundEnd':
-      history = [
-        {
-          id: message.roundId,
-          winnerTeam: message.winnerTeam,
-          finishedAt: Date.now(),
-          scores: message.scores
-        },
-        ...history
-      ].slice(0, 5);
-      ui.renderHistory(state, history);
-      return ui.showRoundEnd(state, message);
+      return onRoundEnd(message);
     case 'roundStart':
       return onRoundStart(message);
     case 'pong':
@@ -290,6 +281,24 @@ function onPaintResult(result) {
 
   renderer.requestDraw();
   ui.renderPlayer(state);
+}
+
+function onRoundEnd(message) {
+  const round = {
+    id: message.roundId,
+    winnerTeam: message.winnerTeam,
+    finishedAt: message.finishedAt,
+    scores: message.scores,
+    board: message.board
+  };
+  // Раунды, в которых никто не играл, сервер в историю не записывает — клиент тоже.
+  if (!playedTeams(round).length) {
+    ui.toast(`Раунд №${round.id} закончился без игроков — начался новый`, 'info');
+    return;
+  }
+  history = [round, ...history].slice(0, HISTORY_SIZE);
+  ui.renderHistory(state, history);
+  ui.showRoundEnd(state, round);
 }
 
 function onRoundStart(message) {

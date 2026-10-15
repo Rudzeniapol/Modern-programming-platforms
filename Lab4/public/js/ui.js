@@ -2,7 +2,8 @@
 // уведомления, диалог входа и итоги раунда. Данные игроков выводятся только
 // через textContent (см. el в util.js) — внедрить HTML через имя нельзя.
 
-import { el, formatDuration, formatTime } from './util.js';
+import { drawFinalBoard } from './renderer.js';
+import { el, formatDuration, formatTime, playedTeams, plural } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -139,21 +140,15 @@ export class UI {
     if (!state.config || !history) return;
     const list = $('history');
     if (!history.length) {
-      list.replaceChildren(el('li', { className: 'empty', text: 'Это первый раунд' }));
+      list.replaceChildren(
+        el('li', {
+          className: 'empty',
+          text: 'Здесь появятся итоги завершённых раундов: итоговая карта и счёт команд'
+        })
+      );
       return;
     }
-    list.replaceChildren(
-      ...history.map((round) => {
-        const winner = round.winnerTeam === null ? null : state.config.teams[round.winnerTeam];
-        const dot = el('span', { className: 'dot' });
-        if (winner) dot.style.setProperty('--team', winner.color);
-        return el('li', {}, [
-          dot,
-          el('span', { text: `№${round.id}: ${winner ? winner.name : 'ничья'}` }),
-          el('span', { className: 'muted', text: formatTime(round.finishedAt) })
-        ]);
-      })
-    );
+    list.replaceChildren(...history.map((round) => roundCard(state.config.teams, round)));
   }
 
   setCellInfo(state, cell) {
@@ -183,13 +178,17 @@ export class UI {
     setTimeout(() => node.remove(), ms + 400);
   }
 
-  showRoundEnd(state, { winnerTeam, scores }) {
+  showRoundEnd(state, round) {
+    const { teams } = state.config;
     const overlay = $('round-overlay');
-    const winner = winnerTeam === null ? null : state.config.teams[winnerTeam];
+    const winner = round.winnerTeam === null ? null : teams[round.winnerTeam];
     $('round-result').textContent = winner ? `Победили ${winner.name}!` : 'Ничья!';
     overlay.style.setProperty('--team', winner ? winner.color : '#888');
-    $('round-details').textContent = scores.teams
-      .map(({ id, cells }) => `${state.config.teams[id].name}: ${cells}`)
+    const map = $('round-map');
+    map.hidden = !round.board;
+    if (round.board) drawFinalBoard(map, round.board, teams);
+    $('round-details').textContent = playedTeams(round)
+      .map(({ id, cells }) => `${teams[id].name}: ${cells}`)
       .join(' · ');
     overlay.hidden = false;
     clearTimeout(this.overlayTimer);
@@ -255,4 +254,61 @@ export class UI {
   closeJoin() {
     if (this.joinDialog.open) this.joinDialog.close();
   }
+}
+
+/**
+ * Карточка завершённого раунда: номер и время, итоговая карта, результат и команды,
+ * которые играли, — сколько клеток у каждой было к концу и сколько игроков участвовало.
+ */
+function roundCard(teams, round) {
+  const winner = round.winnerTeam === null ? null : teams[round.winnerTeam];
+
+  let map;
+  if (round.board) {
+    map = el('canvas', {
+      className: 'round-card__map',
+      attrs: { role: 'img', 'aria-label': `Итоговая карта раунда №${round.id}` }
+    });
+    drawFinalBoard(map, round.board, teams);
+  } else {
+    map = el('p', { className: 'muted small', text: 'Карта этого раунда не сохранилась' });
+  }
+
+  const played = playedTeams(round);
+  const rows = played.map((team) => {
+    const dot = el('span', { className: 'dot' });
+    dot.style.setProperty('--team', teams[team.id].color);
+    const share = round.scores.totalCells ? (team.cells / round.scores.totalCells) * 100 : 0;
+    return el('li', {}, [
+      dot,
+      el('span', { text: teams[team.id].name }),
+      team.players
+        ? el('span', {
+            className: 'muted',
+            text: `${team.players} ${plural(team.players, ['игрок', 'игрока', 'игроков'])}`
+          })
+        : null,
+      el('span', { className: 'round-card__value', text: `${team.cells} · ${share.toFixed(1)}%` })
+    ]);
+  });
+  const absent = teams.filter((team) => !played.some((p) => p.id === team.id));
+
+  const card = el('li', { className: 'round-card' }, [
+    el('div', { className: 'round-card__head' }, [
+      el('strong', { text: `Раунд №${round.id}` }),
+      el('span', { className: 'muted', text: formatTime(round.finishedAt) })
+    ]),
+    map,
+    el('p', { className: 'round-card__result', text: winner ? `Победили ${winner.name}` : 'Ничья' }),
+    el('ul', { className: 'round-card__teams' }, rows),
+    absent.length
+      ? el('p', {
+          className: 'muted small',
+          text: `Не участвовали: ${absent.map((team) => team.name).join(', ')}`
+        })
+      : null
+  ]);
+  // Полоса сверху карточки — цвет победителя.
+  if (winner) card.style.setProperty('--team', winner.color);
+  return card;
 }

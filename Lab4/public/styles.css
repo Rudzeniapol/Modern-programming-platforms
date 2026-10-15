@@ -80,13 +80,22 @@ h2 { font-size: 14px; margin: 0 0 10px; color: var(--muted); font-weight: 600; }
 }
 
 /* ---------- раскладка ---------- */
+/* Слева поле и под ним история, справа боковая панель. Вторая строка — 1fr: если боковая
+   панель выше поля, лишняя высота уходит под историю, а не в зазор между полем и историей.
+   На узком экране — в одну колонку: поле, панель игрока и счёт, затем история. */
 .layout {
   max-width: 1280px; margin: 16px auto; padding: 0 16px;
-  display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start;
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: auto 1fr;
+  grid-template-areas: "board side" "history side";
+  gap: 16px; align-items: start;
 }
 @media (max-width: 960px) {
-  .layout { grid-template-columns: minmax(0, 1fr); }
+  .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "board" "side" "history"; }
 }
+
+.board-panel { grid-area: board; }
+.sidebar { grid-area: side; }
+.history { grid-area: history; }
 
 .board-panel {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -129,6 +138,34 @@ ol.list { counter-reset: place; }
 ol.list li::before { counter-increment: place; content: counter(place) "."; color: var(--muted); width: 18px; }
 ol.list li.empty::before { content: none; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--team, var(--muted)); flex: none; }
+
+/* ---------- история раундов ---------- */
+.history__list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;
+}
+.history__list .empty { grid-column: 1 / -1; font-size: 14px; }
+/* Полоса сверху — цвет победителя (у ничьей — цвет рамки). */
+.round-card {
+  border: 1px solid var(--border); border-radius: 10px; padding: 14px 12px 12px;
+  box-shadow: inset 0 4px 0 var(--team, var(--border));
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+}
+.round-card__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; }
+.round-card__result { margin: 0; font-size: 14px; font-weight: 600; color: var(--team, var(--text)); }
+.round-card__teams { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.round-card__teams li { display: flex; align-items: center; gap: 6px; }
+.round-card__value { margin-left: auto; font-variant-numeric: tabular-nums; }
+.round-card .small { margin: 0; }
+
+/* Итоговая карта: холст 64×40 (пиксель на клетку) растягивается без размытия;
+   пустые клетки прозрачные — их цвет задаёт фон. */
+.round-card__map, .round-overlay__map {
+  display: block; width: 100%; height: auto; border-radius: 6px;
+  background: var(--cell-empty); image-rendering: pixelated;
+}
+.round-overlay__map { width: min(384px, 70vw); margin: 14px auto 10px; }
+.round-overlay__map[hidden] { display: none; }
 
 /* ---------- диалог входа ---------- */
 .join {

@@ -9,6 +9,23 @@ const REMOTE_FLASH_MS = 450;
 const CONFLICT_FLASH_MS = 1100;
 const CURSOR_TTL_MS = 5000;
 
+/**
+ * Итоговая карта раунда (история, итоги раунда): один пиксель холста на клетку.
+ * До нужного размера холст растягивает CSS с image-rendering: pixelated — клетки остаются
+ * чёткими квадратами. Пустые клетки прозрачные: их цвет — фон холста из CSS, поэтому
+ * карта сама подстраивается под светлую и тёмную тему.
+ */
+export function drawFinalBoard(canvas, { width, height, cells }, teams) {
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  for (let i = 0; i < cells.length; i += 1) {
+    if (cells[i] === '.') continue;
+    ctx.fillStyle = teams[Number(cells[i])].color;
+    ctx.fillRect(i % width, Math.floor(i / width), 1, 1);
+  }
+}
+
 export class BoardRenderer {
   constructor(canvas, state, handlers) {
     this.canvas = canvas;

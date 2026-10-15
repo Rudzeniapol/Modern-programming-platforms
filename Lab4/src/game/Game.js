@@ -13,6 +13,8 @@ const { repository } = require('./repository');
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
 const SCORES_THROTTLE_MS = 500;
+// Сколько последних сыгранных раундов показывать в истории.
+const HISTORY_SIZE = 6;
 
 /**
  * Авторитетное состояние игры.
@@ -25,7 +27,7 @@ const SCORES_THROTTLE_MS = 500;
  * События (EventEmitter) — их слушает WebSocket-хаб и рассылает клиентам:
  *   pixel      — клетка перекрашена;
  *   scores     — изменился счёт (не чаще раза в 500 мс);
- *   roundEnd   — раунд закончился, объявлен победитель;
+ *   roundEnd   — раунд закончился: победитель, итоговый счёт и итоговая карта;
  *   roundStart — начался новый раунд с чистым полем.
  */
 class Game extends EventEmitter {
@@ -74,6 +76,8 @@ class Game extends EventEmitter {
     this.round = round;
     this.seq = await repository.maxSeq();
     await this.loadRound();
+    // Пустые раунды могли остаться в БД от прошлых версий — в истории им не место.
+    await repository.pruneRounds(this.roundOptions.keepRounds);
 
     // Сервер мог быть выключен, когда раунд должен был закончиться.
     if (new Date(round.endsAt).getTime() <= this.now()) {
@@ -352,14 +356,26 @@ class Game extends EventEmitter {
     };
   }
 
-  async history(limit = 5) {
+  /** Последние сыгранные раунды: победитель, итоговый счёт и итоговая карта. */
+  async history(limit = HISTORY_SIZE) {
     const rounds = await repository.recentRounds(limit);
     return rounds.map((round) => ({
       id: round.id,
       winnerTeam: round.winnerTeam,
       finishedAt: new Date(round.finishedAt).getTime(),
-      scores: round.scores
+      scores: round.scores,
+      board: round.finalBoard
     }));
+  }
+
+  /**
+   * Поле в компактном виде для истории: строка по символу на клетку построчно —
+   * номер команды ('0'–'3') или '.' для пустой. 64 × 40 = 2560 символов вместо
+   * тысяч троек координат.
+   */
+  encodeBoard() {
+    const cells = Array.from(this.board.team, (team) => (team >= 0 ? team : '.')).join('');
+    return { width: this.width, height: this.height, cells };
   }
 
   scheduleRoundEnd() {
@@ -375,20 +391,34 @@ class Game extends EventEmitter {
     }, delay);
   }
 
-  /** Подводит итоги раунда, сохраняет их и начинает новый раунд с пустым полем. */
+  /**
+   * Подводит итоги раунда, сохраняет их вместе с итоговой картой и начинает новый раунд
+   * с пустым полем. Раунд, в котором никто не играл, в историю не попадает (см. pruneRounds).
+   */
   async rotateRound() {
     const finished = this.round;
-    const result = this.scores();
     const best = Math.max(...this.teamCells);
     const leaders = this.teamCells.filter((cells) => cells === best).length;
     // Победитель — команда с наибольшей территорией; при равенстве или пустом поле — ничья.
     const winnerTeam = best > 0 && leaders === 1 ? this.teamCells.indexOf(best) : null;
+    const board = this.encodeBoard();
+    const finishedAt = this.now();
 
-    const next = await withTransaction(async (db) => {
-      await repository.finishRound(finished.id, winnerTeam, result, db);
+    const { next, scores } = await withTransaction(async (db) => {
+      // Какие команды играли: сколько игроков каждой закрасили хотя бы одну клетку.
+      // Команда может участвовать, но к концу остаться без клеток — поэтому считаем по журналу.
+      const players = new Map(
+        (await repository.roundTeamPlayers(finished.id, db)).map((row) => [row.team, row.players])
+      );
+      const live = this.scores();
+      const result = {
+        ...live,
+        teams: live.teams.map((team) => ({ ...team, players: players.get(team.id) || 0 }))
+      };
+      await repository.finishRound(finished.id, { winnerTeam, scores: result, board }, db);
       const round = await repository.createRound(this.roundOptions.durationSec, db);
       await repository.pruneRounds(this.roundOptions.keepRounds, db);
-      return round;
+      return { next: round, scores: result };
     });
 
     this.round = next;
@@ -399,9 +429,9 @@ class Game extends EventEmitter {
       event: 'round.finished',
       roundId: finished.id,
       winnerTeam,
-      teams: result.teams
+      teams: scores.teams
     });
-    this.emit('roundEnd', { roundId: finished.id, winnerTeam, scores: result });
+    this.emit('roundEnd', { roundId: finished.id, winnerTeam, finishedAt, scores, board });
     this.emit('roundStart', { round: this.publicRound(), sync: this.snapshot(), scores: this.scores() });
   }
 }

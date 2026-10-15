@@ -30,6 +30,26 @@ export function formatTime(ms) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+/** Склонение по числу: plural(3, ['игрок', 'игрока', 'игроков']) → 'игрока'. */
+export function plural(n, [one, few, many]) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+/**
+ * Команды, которые играли в завершённом раунде, — по убыванию территории.
+ * Играла — значит, её игроки закрасили хотя бы одну клетку (к концу клеток может и не остаться).
+ * В итогах старых версий числа игроков нет — тогда судим по клеткам.
+ */
+export function playedTeams(round) {
+  return round.scores.teams
+    .filter((team) => (team.players === undefined ? team.cells > 0 : team.players > 0))
+    .sort((a, b) => b.cells - a.cells);
+}
+
 /** Создание DOM-элемента. Текст всегда через textContent — никакого innerHTML с данными игроков. */
 export function el(tag, { className, text, attrs } = {}, children = []) {
   const node = document.createElement(tag);

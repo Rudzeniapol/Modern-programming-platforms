@@ -29,6 +29,11 @@
         <p id="board-hint" class="board-hint"></p>
       </section>
 
+      <section class="card history">
+        <h2>Прошлые раунды</h2>
+        <ul id="history" class="history__list"></ul>
+      </section>
+
       <aside class="sidebar">
         <section id="me-card" class="card" hidden>
           <div class="me">
@@ -53,11 +58,6 @@
         <section class="card">
           <h2>Онлайн <span id="spectators" class="muted small"></span></h2>
           <ul id="online" class="list"></ul>
-        </section>
-
-        <section class="card">
-          <h2>Прошлые раунды</h2>
-          <ul id="history" class="list"></ul>
         </section>
       </aside>
     </main>
@@ -85,6 +85,7 @@
       <div class="round-overlay__card">
         <p class="muted">Раунд окончен</p>
         <p id="round-result" class="round-overlay__title"></p>
+        <canvas id="round-map" class="round-overlay__map" role="img" aria-label="Итоговая карта раунда"></canvas>
         <p id="round-details" class="muted"></p>
         <p class="muted small">Новый раунд уже начался — поле очищено</p>
       </div>

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const crypto = require('crypto');
 
 const { startServer, pool, resetDatabase, TestClient, newPlayer } = require('./helpers');
+const { repository } = require('../src/game/repository');
 
 let app;
 const clients = [];
@@ -261,6 +262,73 @@ describe('раунды', () => {
     const viewer = await connect();
     const welcome = await viewer.hello();
     assert.equal(welcome.history[0].winnerTeam, 3);
+  });
+
+  it('в истории — итоговая карта раунда и команды, которые играли', async () => {
+    const alice = await player('Алиса', 3);
+    const bob = await player('Боб', 0);
+    const carol = await player('Кэрол', 1);
+    await alice.client.paint(0, 0);
+    await alice.client.paint(1, 0);
+    await bob.client.paint(2, 0);
+    await carol.client.paint(0, 1);
+    // Алиса перекрашивает единственную клетку синих: команда играла, но осталась без клеток.
+    await alice.client.paint(0, 1, { baseVersion: 1 });
+
+    await app.game.queue.run(() => app.game.rotateRound());
+    const end = await bob.client.next('roundEnd');
+
+    // Карта — строка по символу на клетку построчно: команда или '.'.
+    assert.equal(end.board.width, 64);
+    assert.equal(end.board.height, 40);
+    assert.equal(end.board.cells.length, 64 * 40);
+    assert.equal(end.board.cells.slice(0, 4), '330.');
+    assert.equal(end.board.cells.slice(64, 66), '3.');
+    assert.deepEqual(end.scores.teams, [
+      { id: 0, cells: 1, players: 1 },
+      { id: 1, cells: 0, players: 1 },
+      { id: 2, cells: 0, players: 0 },
+      { id: 3, cells: 3, players: 1 }
+    ]);
+
+    // То же самое сохранено в БД и приходит новым клиентам в welcome.
+    const viewer = await connect();
+    const [round] = (await viewer.hello()).history;
+    assert.equal(round.id, 1);
+    assert.deepEqual(round.board, end.board);
+    assert.deepEqual(round.scores.teams, end.scores.teams);
+  });
+
+  it('раунд, в котором никто не играл, в историю не попадает', async () => {
+    const viewer = await connect();
+    await viewer.hello();
+    await app.game.queue.run(() => app.game.rotateRound());
+
+    const end = await viewer.next('roundEnd');
+    assert.equal(end.winnerTeam, null);
+    assert.ok(end.scores.teams.every((team) => team.cells === 0 && team.players === 0));
+
+    const { rows } = await pool.query('SELECT id, finished_at IS NULL AS active FROM rounds');
+    assert.deepEqual(rows, [{ id: 2, active: true }]);
+    assert.deepEqual((await (await connect()).hello()).history, []);
+  });
+
+  it('очистка оставляет последние сыгранные раунды и удаляет пустые', async () => {
+    // Раунд 1 — активный. Раунды 2–7 завершены; сыгранные (с клетками на поле) — 2, 4, 5, 7.
+    await pool.query(
+      `INSERT INTO rounds (ends_at, finished_at) SELECT now(), now() FROM generate_series(2, 7)`
+    );
+    await pool.query(
+      `INSERT INTO cells (round_id, x, y, team, version) SELECT id, 0, 0, 0, 1 FROM unnest(ARRAY[2, 4, 5, 7]) AS id`
+    );
+
+    await repository.pruneRounds(2);
+
+    const { rows } = await pool.query('SELECT id FROM rounds ORDER BY id');
+    assert.deepEqual(
+      rows.map((row) => row.id),
+      [1, 5, 7]
+    );
   });
 });
 

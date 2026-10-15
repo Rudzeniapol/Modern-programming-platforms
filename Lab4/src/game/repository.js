@@ -8,7 +8,8 @@ const ROUND_SELECT = `
   ends_at     AS "endsAt",
   finished_at AS "finishedAt",
   winner_team AS "winnerTeam",
-  scores
+  scores,
+  final_board AS "finalBoard"
 `;
 
 const PLAYER_SELECT = `
@@ -32,18 +33,42 @@ const repository = {
     return rows[0];
   },
 
-  async finishRound(id, winnerTeam, scores, client = pool) {
-    await client.query('UPDATE rounds SET finished_at = now(), winner_team = $2, scores = $3 WHERE id = $1', [
-      id,
-      winnerTeam,
-      JSON.stringify(scores)
-    ]);
+  async finishRound(id, { winnerTeam, scores, board }, client = pool) {
+    await client.query(
+      `UPDATE rounds SET finished_at = now(), winner_team = $2, scores = $3, final_board = $4
+        WHERE id = $1`,
+      [id, winnerTeam, JSON.stringify(scores), JSON.stringify(board)]
+    );
   },
 
-  /** Удаляет поле и журнал ходов старых раундов, оставляя keep последних. */
+  /** Сколько игроков каждой команды закрасили в раунде хотя бы одну клетку. */
+  async roundTeamPlayers(roundId, client = pool) {
+    const { rows } = await client.query(
+      `SELECT team, COUNT(DISTINCT player_id)::int AS players
+         FROM moves
+        WHERE round_id = $1 AND status = 'ok'
+        GROUP BY team`,
+      [roundId]
+    );
+    return rows;
+  },
+
+  /**
+   * Оставляет keep последних сыгранных раундов (с непустым полем); остальные завершённые
+   * удаляются вместе с полем и журналом ходов (ON DELETE CASCADE). Раунды, в которых никто
+   * не играл, удаляются сразу — иначе, пока сервер простаивает, они вытеснили бы из истории
+   * сыгранные. Активный раунд не трогается.
+   */
   async pruneRounds(keep, client = pool) {
     await client.query(
-      `DELETE FROM rounds WHERE id NOT IN (SELECT id FROM rounds ORDER BY id DESC LIMIT $1)`,
+      `DELETE FROM rounds
+        WHERE finished_at IS NOT NULL
+          AND id NOT IN (
+            SELECT r.id FROM rounds r
+             WHERE r.finished_at IS NOT NULL
+               AND EXISTS (SELECT 1 FROM cells c WHERE c.round_id = r.id)
+             ORDER BY r.id DESC
+             LIMIT $1)`,
       [keep]
     );
   },

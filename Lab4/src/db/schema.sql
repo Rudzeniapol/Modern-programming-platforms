@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS players (
 );
 
 -- Раунды. Активный раунд — тот, у которого finished_at IS NULL; такой может быть только один.
+-- scores — итоговый счёт: по каждой команде клетки к концу раунда и сколько её игроков
+-- участвовало, плюс лучшие игроки.
 CREATE TABLE IF NOT EXISTS rounds (
   id          SERIAL      PRIMARY KEY,
   started_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -25,6 +27,12 @@ CREATE TABLE IF NOT EXISTS rounds (
   winner_team SMALLINT,
   scores      JSONB
 );
+
+-- Итоговая карта — снимок поля в момент завершения раунда:
+--   { "width": 64, "height": 40, "cells": "....0012…" }
+-- cells — строка длиной width × height, по символу на клетку построчно:
+-- '0'–'3' — команда, '.' — пустая клетка.
+ALTER TABLE rounds ADD COLUMN IF NOT EXISTS final_board JSONB;
 
 CREATE UNIQUE INDEX IF NOT EXISTS rounds_single_active_idx ON rounds ((true)) WHERE finished_at IS NULL;
 
